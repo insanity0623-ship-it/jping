@@ -1,0 +1,94 @@
+// server.js
+// Express backend: requires X-API-KEY header and uses Twilio to send SMS.
+
+require('dotenv').config();
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const cors = require('cors');
+const Twilio = require('twilio');
+
+const app = express();
+app.use(express.json());
+
+// CORS: allow the origin(s) you expect to call this API.
+const corsOrigins = (process.env.CORS_ALLOWED_ORIGINS || '*');
+app.use(cors({
+  origin: (origin, cb) => {
+    if (corsOrigins === '*' || !origin) return cb(null, true);
+    const allowed = corsOrigins.split(',').map(s => s.trim());
+    if (allowed.includes(origin)) return cb(null, true);
+    cb(new Error('Not allowed by CORS'));
+  }
+}));
+
+// Rate limiting to reduce abuse
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: parseInt(process.env.RATE_LIMIT_MAX || '10', 10),
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use(limiter);
+
+// Config
+const API_KEY = process.env.API_KEY || '';
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || '';
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || '';
+
+if (!API_KEY) console.warn('Warning: API_KEY is not set. Set API_KEY in .env for security.');
+if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) {
+  console.warn('Warning: Twilio credentials missing. Configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER.');
+}
+
+const twilioClient = (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) ? Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) : null;
+
+function normalizeNumber(n) {
+  return (n || '').toString().trim();
+}
+function looksLikeE164(n) {
+  return /^\+?[0-9]{7,15}$/.test(n.replace(/[\s\-()]/g,''));
+}
+
+// Middleware to require API key header
+function requireApiKey(req, res, next) {
+  const key = req.get('x-api-key') || '';
+  if (!API_KEY) {
+    return res.status(500).json({ error: 'Server not configured with API_KEY' });
+  }
+  if (!key || key !== API_KEY) return res.status(401).json({ error: 'Unauthorized' });
+  next();
+}
+
+// Health check
+app.get('/health', (req, res) => res.json({ ok: true }));
+
+// Protected send endpoint
+app.post('/send', requireApiKey, async (req, res) => {
+  try {
+    const { number, message } = req.body || {};
+    const to = normalizeNumber(number);
+    const body = String(message || '').slice(0, 1600);
+
+    if (!to) return res.status(400).json({ error: 'Missing number' });
+    if (!looksLikeE164(to)) return res.status(400).json({ error: 'Invalid phone number format (use +E.164)' });
+
+    if (!twilioClient) {
+      return res.status(500).json({ error: 'Twilio not configured on server' });
+    }
+
+    const msg = await twilioClient.messages.create({
+      from: TWILIO_FROM_NUMBER,
+      to,
+      body
+    });
+
+    return res.json({ ok: true, sid: msg.sid });
+  } catch (err) {
+    console.error('Error sending SMS', err);
+    return res.status(500).json({ error: err.message || 'Failed to send' });
+  }
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`SMS backend listening on ${port}`));
