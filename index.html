@@ -1,102 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>jping - Chill Texting Website</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <title>jping - Send SMS from any device</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f5f6fa;
-      color: #222;
-      margin: 0;
-      padding: 0;
-    }
-    header {
-      background: #2f3640;
-      color: #fff;
-      padding: 1rem;
-      text-align: center;
-    }
-    main {
-      max-width: 500px;
-      margin: 2rem auto;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      padding: 2rem;
-    }
-    h2 {
-      color: #4078c0;
-      margin-top: 0;
-    }
-    label {
-      display: block;
-      margin: 1rem 0 0.5rem 0;
-    }
-    input, textarea {
-      width: 100%;
-      padding: 0.5rem;
-      font-size: 1rem;
-      margin-bottom: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      box-sizing: border-box;
-    }
-    button {
-      background: #4078c0;
-      color: #fff;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      font-size: 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      margin-top: 0.5rem;
-    }
-    button:hover {
-      background: #314e6e;
-    }
-    .reel {
-      background: #f3f3ff;
-      border-left: 4px solid #4078c0;
-      margin: 1.5rem 0;
-      padding: 1rem;
-      border-radius: 4px;
-    }
-    footer {
-      text-align: center;
-      color: #999;
-      margin: 2rem 0 1rem 0;
-      font-size: 0.9rem;
-    }
+    body { font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; }
+    h1 { color: #333; text-align: center; }
+    form { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+    input, textarea { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { width: 100%; padding: 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
+    button:hover { background-color: #0056b3; }
+    .status-message { padding: 10px; border-radius: 4px; margin-top: 15px; text-align: center; }
+    .status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .status-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .note { font-size: 0.8em; color: #999; margin-top: -10px; margin-bottom: 15px; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>jping</h1>
-    <p>A chill texting website to connect with friends and reels.</p>
-  </header>
-  <main>
-    <h2>Text or Call a Friend</h2>
-    <form>
-      <label for="number">Phone Number:</label>
-      <input type="text" id="number" name="number" placeholder="Enter phone number" required>
+  <h1>jping 📱</h1>
+  <form id="smsForm">
+    <p class="note">To send from any device (desktop/tablet), fill in the Backend URL and API Key. Leave them blank to fall back to your phone's SMS app.</p>
+    
+    <label for="backendUrl">Backend URL (Render Address)</label>
+    <input type="url" id="backendUrl" placeholder="https://your-messenger-house.onrender.com" />
+    
+    <label for="apiKey">API Key (The Secret Knock)</label>
+    <input type="password" id="apiKey" placeholder="Your_Secret_Key_Here" />
+
+    <label for="number">Recipient Phone Number (E.164: +1XXXXXXXXXX)</label>
+    <input type="tel" id="number" placeholder="+19023334947" required />
+
+    <label for="message">Message</label>
+    <textarea id="message" rows="4" maxlength="1600" required></textarea>
+
+    <button type="submit" id="sendButton">Send Text</button>
+    <div id="status"></div>
+  </form>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('smsForm');
+      const numberInput = document.getElementById('number');
+      const messageInput = document.getElementById('message');
+      const backendUrlInput = document.getElementById('backendUrl');
+      const apiKeyInput = document.getElementById('apiKey');
+      const statusDiv = document.getElementById('status');
       
-      <label for="message">Message:</label>
-      <textarea id="message" name="message" rows="3" placeholder="Type your message here"></textarea>
+      // Load saved values from local storage for easy testing
+      backendUrlInput.value = localStorage.getItem('backendUrl') || '';
+      apiKeyInput.value = localStorage.getItem('apiKey') || '';
+      
+      // Fill values from URL query parameters (like the link you gave me)
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('number')) numberInput.value = params.get('number').replace(/[^\d+]/g, '');
+      if (params.get('message')) messageInput.value = params.get('message');
 
-      <button type="submit">Send Text</button>
-      <button type="button" onclick="alert('Calling...')">Call Now</button>
-    </form>
+      function showStatus(message, isError) {
+        statusDiv.innerHTML = message;
+        statusDiv.className = 'status-message ' + (isError ? 'status-error' : 'status-success');
+      }
 
-    <div class="reel">
-      <h3>Send a Reel!</h3>
-      <button type="button" onclick="alert('Funny reel sent!')">Send Funny Reel</button>
-      <button type="button" onclick="alert('Cool reel sent!')">Send Cool Reel</button>
-    </div>
-  </main>
-  <footer>
-    &copy; 2025 jping &mdash; Connect and have fun!
-  </footer>
+      function sanitizeE164(n) {
+          // Removes all non-digit characters except for a leading plus sign
+          let clean = n.replace(/[^\d+]/g, '');
+          if (clean.startsWith('+') && clean.length > 1) {
+              return clean;
+          }
+          // If no plus, assume US format for the mobile fallback, but the server requires plus.
+          return clean.startsWith('+') ? clean : ('+' + clean); 
+      }
+      
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        statusDiv.innerHTML = '';
+        const number = sanitizeE164(numberInput.value);
+        const message = messageInput.value;
+        const backendUrl = backendUrlInput.value.trim();
+        const apiKey = apiKeyInput.value.trim();
+
+        // Save for next time
+        localStorage.setItem('backendUrl', backendUrl);
+        localStorage.setItem('apiKey', apiKey);
+
+        // --- Option 1: Send via Server (Desktop/Any Device) ---
+        if (backendUrl && apiKey) {
+          showStatus('Sending via server...', false);
+          
+          try {
+            const response = await fetch(backendUrl + '/send', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey // Sending the Secret Knock
+              },
+              body: JSON.stringify({ number, message })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              showStatus('✅ Text sent successfully! SID: ' + data.sid, false);
+            } else {
+              showStatus('❌ Server Error: ' + (data.error || 'Failed to send message'), true);
+            }
+          } catch (error) {
+            console.error(error);
+            showStatus('❌ Network or Server Connection Error. See console.', true);
+          }
+        } 
+        // --- Option 2: Fallback to Phone SMS App (Mobile Only) ---
+        else {
+          const body = encodeURIComponent(message);
+          window.location.href = `sms:${number}?body=${body}`;
+          showStatus('🔗 Opening your phone’s SMS app. You must press Send there!', true);
+        }
+      });
+    });
+  </script>
 </body>
 </html>
